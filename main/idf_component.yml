@@ -1,0 +1,13 @@
+## IDF Component Manager Manifest File
+dependencies:
+  ## Required IDF version
+  idf:
+    version: '>=5.4.0'
+  espressif/esp32_p4_function_ev_board: 
+    version: ^4.2.0
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_wifi_remote: 
+    version: '*'
+    rules:
+      - if: "target in [esp32p4]"
