@@ -53,4 +53,5 @@ public:
     
     virtual void turnOff(uint16_t address, bool ack = false);
 
+    virtual void getOn(uint16_t address);
 };

@@ -114,6 +114,7 @@ static void lvgl_nodes_select_node(int addr)
 
         lv_obj_set_size(cont0, LV_SIZE_CONTENT, 0);
         auto click = [](lv_event_t* ev) {
+            lv_event_code_t code = lv_event_get_code(ev);
             auto cont = (lv_obj_t *)lv_event_get_user_data(ev);
             if(lv_obj_has_flag(cont, LV_OBJ_FLAG_USER_1))
             {

@@ -8,6 +8,7 @@ idf_component_register(SRCS
                     "lvgl/modal_element.cpp"
 
                     "lvgl/models/model_1000.cpp"
+                    "lvgl/models/model_1002.cpp"
 
                     "ble-mesh/main.cpp"
                     INCLUDE_DIRS "." "include")

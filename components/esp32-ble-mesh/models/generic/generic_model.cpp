@@ -142,7 +142,7 @@ esp_err_t IGenericCliModel::getState(uint16_t address, uint32_t opcode)
  */
 void IGenericCliModel::onEvent(uint32_t event, uint32_t op_code, void *params)
 {
-    ESP_LOGW(__func__, "%s event: %ld, OP code: 0x%04lx\n", name(), event, op_code);
+    ESP_LOGW(__func__, "%s event: %ld, OP code: 0x%04lx", name(), event, op_code);
     if(cb)
-        cb->onEvent(this, event, params);
+        cb->onEvent(this, event, op_code, params);
 }

@@ -31,3 +31,9 @@ void GenericOnOffCliModel::turnOff(uint16_t address, bool ack)
         opcode = ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK;
     sendState(address, opcode, &val);
 }
+
+void GenericOnOffCliModel::getOn(uint16_t address)
+{
+    uint32_t opcode = ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_GET;
+    getState(address, opcode);
+}

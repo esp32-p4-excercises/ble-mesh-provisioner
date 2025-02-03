@@ -5,7 +5,6 @@
 #include "models.h"
 
 const char* mesh_model_get_type(uint16_t id);
-void mesh_client_bind(uint16_t addr, uint16_t model);
 ble_mesh_comp_t *mesh_get_composition(uint16_t addr);
 void mesh_model_sub_add(uint16_t addr, uint16_t sub, uint16_t model_id);
 void mesh_model_sub_del(uint16_t addr, uint16_t sub, uint16_t model_id);
@@ -82,62 +81,58 @@ static void add_subscribe_menu(lv_obj_t* parent)
     lv_msgbox_add_title(sub_cont, "Subscribe");
     lv_obj_set_width(sub_cont, LV_PCT(100));
     auto box_c = lv_msgbox_get_content(sub_cont);
+    auto box = lv_obj_create(box_c);
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_size(box, LV_PCT(100), LV_SIZE_CONTENT);
+
+    for (size_t a = 0; a < 3; a++)
+    {
+        auto _cont = lv_obj_create(box);
+        lv_obj_set_flex_flow(_cont, LV_FLEX_FLOW_ROW);
+        lv_obj_set_size(_cont, LV_PCT(100), LV_SIZE_CONTENT);
+
+        auto lbl = lv_label_create(_cont);
+        lv_label_set_text_fmt(lbl, "0x%04X", 0xc000 + a);
+
+        auto btn = lv_button_create(_cont);
+        auto label = lv_label_create(btn);
+        lv_label_set_text(label, "Add");
+        lv_obj_align_to(btn, _cont, LV_ALIGN_RIGHT_MID, 0, 0);
+
+        auto click = [](lv_event_t* ev)
+        {
+            uint16_t addr = (uint32_t)lv_event_get_user_data(ev);
+            mesh_model_sub_add(address, addr, model_id);
+        };
+        lv_obj_add_event(btn, click, LV_EVENT_SHORT_CLICKED, (void*)0xc000 + a);
+    }
 
     auto comp = *mesh_get_composition(address);
-    for (size_t i = 0; i < comp.element_num; i++)
+    auto el = comp.elements[address - comp.node_addr];
+
+    for (size_t j = 0; j < el.count; j++)
     {
-        auto el = comp.elements[i];
-        if (el.elem_addr != address)
-            continue;
-        for (size_t j = 0; j < el.count; j++)
+        for (size_t k = 0; k < 3; k++)
         {
-            if (el.models[j].mod_id != model_id)
-                continue;
-
-            auto _cont = lv_obj_create(box_c);
-            lv_obj_set_flex_flow(_cont, LV_FLEX_FLOW_ROW);
-            lv_obj_set_size(_cont, LV_PCT(100), LV_SIZE_CONTENT);
-
-            for (size_t a = 0; a < 3; a++)
+            auto sub_adr = el.models[j].subs[k];
+            if (sub_adr)
             {
-                auto lbl = lv_label_create(_cont);
-                lv_label_set_text_fmt(lbl, "0x%04X", 0xc000 + a);
-
-                auto btn = lv_button_create(_cont);
-                auto label = lv_label_create(btn);
-                lv_label_set_text(label, "Add");
-                lv_obj_align_to(btn, _cont, LV_ALIGN_RIGHT_MID, 0, 0);
-
-                auto click = [](lv_event_t* ev)
+                auto click1 = [](lv_event_t* ev)
                 {
-                    uint16_t addr = (uint32_t)lv_event_get_user_data(ev);
-                    mesh_model_sub_add(address, addr, model_id);
+                    auto addr = (uint32_t)lv_event_get_user_data(ev);
+                    mesh_model_sub_del(address, addr, model_id);
                 };
-                lv_obj_add_event(btn, click, LV_EVENT_SHORT_CLICKED, (void*)0xc000 + a);
-            }
-
-            for (size_t k = 0; k < 3; k++)
-            {
-                auto sub_adr = el.models[j].subs[k];
-                if (sub_adr)
-                {
-                    auto click1 = [](lv_event_t* ev)
-                    {
-                        auto addr = (uint32_t)lv_event_get_user_data(ev);
-                        mesh_model_sub_del(address, addr, model_id);
-                    };
-                    auto _cont = lv_obj_create(box_c);
-                    lv_obj_set_flex_flow(_cont, LV_FLEX_FLOW_ROW);
-                    lv_obj_set_size(_cont, LV_PCT(100), LV_SIZE_CONTENT);
-                    auto label = lv_label_create(_cont);
-                    lv_label_set_text_fmt(label, "0x%04x ", sub_adr);
-                    auto btn = lv_button_create(_cont);
-                    label = lv_label_create(btn);
-                    lv_label_set_text(label, "Del");
-                    lv_obj_add_event(btn, click1, LV_EVENT_SHORT_CLICKED, (void*)sub_adr);
-                    printf("\tSUB: 0x%04x\n", sub_adr);
-                }                
-            }
+                auto _cont = lv_obj_create(box_c);
+                lv_obj_set_flex_flow(_cont, LV_FLEX_FLOW_ROW);
+                lv_obj_set_size(_cont, LV_PCT(100), LV_SIZE_CONTENT);
+                auto label = lv_label_create(_cont);
+                lv_label_set_text_fmt(label, "0x%04x ", sub_adr);
+                auto btn = lv_button_create(_cont);
+                label = lv_label_create(btn);
+                lv_label_set_text(label, "Del");
+                lv_obj_add_event(btn, click1, LV_EVENT_SHORT_CLICKED, (void*)sub_adr);
+                printf("\tSUB: 0x%04x\n", sub_adr);
+            }                
         }
     }
 }
@@ -149,6 +144,10 @@ static void add_model_action(lv_obj_t* parent)
     case 0x1000:{
         model_1000_modal_action(parent, address);
         break;
+    case 0x1002:{
+        model_1002_modal_action(parent, address);
+        break;
+    }
     }
     default:
         ESP_LOGW("", "Model action not implemented");
@@ -189,6 +188,12 @@ void model_modal_mbox_open(uint16_t addr, uint16_t model)
     lv_obj_align(main_mbox, LV_ALIGN_TOP_MID, 0, 10);
  
     free(title);
+
+    lv_obj_add_event(par, [](lv_event_t* e){
+        auto obj = lv_event_get_target_obj(e);
+        lv_obj_delete(obj);
+    }, LV_EVENT_PRESSED, NULL);
+
     bsp_display_unlock();
 }
 

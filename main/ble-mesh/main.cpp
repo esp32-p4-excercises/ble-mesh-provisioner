@@ -13,16 +13,24 @@ extern "C"
 
 #include "ble_mesh_provisioner.h"
 #include "generic_on_off_models.h"
+#include "generic_level_models.h"
 
 static void mesh_composition_data_parse(uint16_t addr);
 extern "C" void nvs_dump(const char *partName);
 void lvgl_modal_update_subs();
 void lvgl_refresh_unprovisioned_device();
+void lvgl_slider_update_level(uint16_t addr, int lvl);
+void lvgl_update_onoff_btn(uint16_t addr, uint8_t lvl);
 
 static BLEmeshProvisioner *provisioner;
 static std::map<uint16_t, ble_mesh_comp_t> nodes_comp;
 
 class ConfigCliCB : public BLEmeshModelCb
+{
+    virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
+};
+
+class GenericCliCB : public BLEmeshModelCb
 {
     virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
 };
@@ -60,6 +68,10 @@ void init_ble_mesh()
     auto onoffCli = new GenericOnOffCliModel("on-off cli");
     provisioner->addPrimaryModel(onoffCli);
 
+    provisioner = BLEmeshProvisioner::GetInstance();
+    auto levelCli = new GenericLevelCliModel("level cli");
+    provisioner->addPrimaryModel(levelCli);
+
     // when all models are added
     provisioner->init_ble();
     provisioner->init_mesh();
@@ -70,8 +82,13 @@ void init_ble_mesh()
     provisioner->enableProvisioning(ESP_BLE_MESH_PROV_GATT);
 
     provisioner->configCli()->setCb(new ConfigCliCB());
+    auto genericCb = new GenericCliCB();
+    levelCli->setCb(genericCb);
+    onoffCli->setCb(genericCb);
     onoffCli->bindLocalAppKey();
     onoffCli->keys(0, 0); // hardcoded
+    levelCli->bindLocalAppKey();
+    levelCli->keys(0, 0); // hardcoded
 
     auto count = provisioner->nodesCount();
     auto nodes = provisioner->getNodes();
@@ -191,7 +208,7 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
         auto len = net_buf->len;
         ESP_LOG_BUFFER_HEX("", data, len);
         auto comp = mesh_get_composition(element_addr);
-        printf("\t\t\t ELEM: %d\n", element_addr - unicast_addr);
+        printf("\t\t\t ELEM: %d / %d\n", element_addr - unicast_addr, len);
         for (size_t i = 0; i < comp->element_num; i++)
         {
             if (comp->elements[i].elem_addr != element_addr)
@@ -223,7 +240,7 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
         break;
     }
     default:
-        ESP_LOGW("", "CLI cb not handled opcode: 0x%04x", opcode);
+        ESP_LOGW("", "config cli cb not handled opcode: 0x%04x", opcode);
         break;
     }
 }
@@ -284,30 +301,6 @@ void mesh_model_sub_del(uint16_t addr, uint16_t sub, uint16_t model_id)
     provisioner->configCli()->modelSubDelete(node->node_addr, addr, sub, model_id);
 }
 
-void mesh_client_bind(uint16_t addr, uint16_t model)
-{
-    auto comp = *mesh_get_composition(addr);
-
-    for (size_t i = 0; i < comp.element_num; i++)
-    {
-        auto el = comp.elements[i];
-        auto node_addr = comp.node_addr;
-        printf("\tnode: 0x%04X, 0x%04X => 0x%04X\n", node_addr, addr, el.elem_addr);
-        if (el.elem_addr == addr)
-        {
-            for (size_t j = 0; j < el.count; j++)
-            {
-                if ((el.models[j].mod_id != 0 and el.models[j].vnd_id == 0xffff) or el.models[j].vnd_id != 0xffff)
-                {
-                    assert(el.models[j].vnd_id);
-                    printf("\t\tEL: %d, model: 0x%04X, vendor: 0x%04X\n", i, el.models[j].mod_id, el.models[j].vnd_id);
-                    mesh_model_sub_get(addr, model);
-                }
-            }
-        }
-    }
-}
-
 void mesh_node_reset_node(uint16_t addr)
 {
     esp_ble_mesh_node_t* node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
@@ -319,9 +312,28 @@ void onoff_client_publish(uint16_t addr, bool on)
     auto model = (GenericOnOffCliModel *)provisioner->findModel(0x1001);
     assert(model);
     if (on)
-        model->turnOn(addr);
+        model->turnOn(addr, true);
     else
-        model->turnOff(addr);
+        model->turnOff(addr, true);
+}
+
+void mesh_model_get_onoff(uint16_t addr)
+{
+    auto model = (GenericOnOffCliModel *)provisioner->findModel(0x1001);
+    assert(model);
+    model->getOn(addr);
+}
+
+void mesh_model_get_level(uint16_t address)
+{
+    auto model = (GenericLevelCliModel*)provisioner->findModel(0x1003);
+    model->level(address);
+}
+
+void mesh_model_set_level(uint16_t addr, int lvl)
+{
+    auto model = (GenericLevelCliModel*)provisioner->findModel(0x1003);
+    model->level(addr, lvl);
 }
 
 static void mesh_composition_data_parse(uint16_t addr)
@@ -351,7 +363,6 @@ static void mesh_composition_data_parse(uint16_t addr)
             el.models[j].mod_id = *(uint16_t *)data;
             el.models[j].vnd_id = 0xffff;
             data = data + 2;
-            // printf("\tEL: %d, model: 0x%04X, vendor: 0x%04X\n", i, el.models[j].mod_id, el.models[j].vnd_id);
             el.count++;
         }
 
@@ -362,7 +373,6 @@ static void mesh_composition_data_parse(uint16_t addr)
             el.models[j].mod_id = *(uint16_t *)data;
             data = data + 2;
             el.count++;
-            // printf("\tEL: %d, model: 0x%04X, vendor: 0x%04X\n", i, el.models[j].mod_id, el.models[j].vnd_id);
         }
     }
 
@@ -389,53 +399,104 @@ const char *mesh_model_get_type(uint16_t id)
 {
     switch (id)
     {
-    case 0:
-        return "config srv";
-    case 1:
-        return "config cli";
-    case 2:
-        return "health srv";
-    case 3:
-        return "health cli";
+    case 0x0000:
+        return "config server";
+    case 0x0001:
+        return "config client";
+    case 0x0002:
+        return "health server";
+    case 0x0003:
+        return "health client";
     case 0x1000:
-        return "gen on/off srv";
+        return "generic on/off server";
     case 0x1001:
-        return "gen on/off cli";
+        return "generic on/off client";
     case 0x1002:
-        return "gen level srv";
+        return "generic level server";
     case 0x1003:
-        return "gen level cli";
+        return "generic level client";
     case 0x100e:
-        return "gen loc srv";
+        return "generic loc server";
     case 0x100f:
-        return "gen loc setup srv";
+        return "generic loc setup server";
     case 0x1010:
-        return "gen loc cli";
+        return "generic loc client";
     case 0x100c:
-        return "gen battery srv";
+        return "generic battery server";
     case 0x100d:
-        return "gen battery cli";
+        return "generic battery client";
     case 0x1200:
-        return "time srv";
+        return "time server";
     case 0x1201:
-        return "time setup srv";
+        return "time setup server";
     case 0x1202:
-        return "time cli";
+        return "time client";
     case 0x1203:
-        return "scene srv";
+        return "scene server";
     case 0x1204:
-        return "scene setup srv";
+        return "scene setup server";
     case 0x1205:
-        return "scene cli";
+        return "scene client";
     case 0x1300:
-        return "lightness srv";
+        return "lightness server";
     case 0x1302:
-        return "lightness cli";
+        return "lightness client";
     case 0x1307:
-        return "light hsl srv";
+        return "light hsl server";
     case 0x1309:
-        return "light hsl cli";
+        return "light hsl client";
     default:
         return "not supported";
+    }
+}
+
+void GenericCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params)
+{
+    ESP_LOGI("", "%s:%d, OP code: 0x%04lx", __func__, __LINE__, opcode);
+    auto param = (esp_ble_mesh_generic_client_cb_param_t *)params;
+    auto unicast_addr = param->params->ctx.addr;
+    auto node = esp_ble_mesh_provisioner_get_node_with_addr(unicast_addr);
+    if(event == ESP_BLE_MESH_CFG_CLIENT_TIMEOUT_EVT)
+    {
+        auto _opcode = param->params->opcode;
+        switch (opcode)
+        {
+        
+        default:
+            ESP_LOGW("", "level CLI timeout not handled opcode: 0x%04x", opcode);
+            break;
+        }
+        return;
+    }
+
+    switch (opcode)
+    {
+        case ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_STATUS:{
+            auto level_status = param->status_cb.level_status;
+            auto present_level = level_status.present_level;
+            if(0)
+            {
+                auto target_level = level_status.target_level;
+                auto remain_time = level_status.remain_time;
+            }
+            bsp_display_lock(0);
+            lvgl_slider_update_level(unicast_addr, present_level);
+            bsp_display_unlock();
+
+            break;
+        }
+        case ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS:{
+            auto onoff_status = param->status_cb.onoff_status;
+            auto present_onoff = onoff_status.present_onoff;
+
+            bsp_display_lock(0);
+            lvgl_update_onoff_btn(unicast_addr, present_onoff);
+            bsp_display_unlock();
+
+            break;
+        }
+    default:
+        ESP_LOGW("", "%s:%d, OP code: 0x%04lx", __func__, __LINE__, opcode);
+        break;
     }
 }
