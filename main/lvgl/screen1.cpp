@@ -13,11 +13,9 @@ static void screen_evt_cb(lv_event_t *ev)
     auto scr = (lv_obj_t *)lv_event_get_target(ev);
     if (code == LV_EVENT_SCREEN_LOADED)
     {
-        // printf("screen 1 loaded\n");
     }
     else if (code == LV_EVENT_SCREEN_UNLOADED)
     {
-        // printf("screen 1 unloaded\n");
         left_pane = nullptr;
         lv_obj_delete(scr);
     }

@@ -40,6 +40,15 @@ static void button4_evt_cb(lv_event_t *ev)
     }
 }
 
+static void button5_evt_cb(lv_event_t *ev)
+{
+    lv_event_code_t code = lv_event_get_code(ev);
+    if (code == LV_EVENT_SHORT_CLICKED)
+    {
+        lvgl_screen5();
+    }
+}
+
 
 static void button_add_style(lv_obj_t* btn)
 {
@@ -103,7 +112,7 @@ static void menu_add_button(lv_obj_t* cont, lv_event_cb_t cb, const char* txt)
     lv_obj_add_event(btn, cb, LV_EVENT_SHORT_CLICKED, NULL);
 }
 
-void lvgl_top_menu(lv_obj_t *scr)
+void lvgl_top_menu()
 {
     /*Create a container with ROW flex direction*/
     lv_obj_t * cont_row = lv_obj_create(lv_layer_top());
@@ -114,5 +123,6 @@ void lvgl_top_menu(lv_obj_t *scr)
     menu_add_button(cont_row, button1_evt_cb, "Unprov");
     menu_add_button(cont_row, button2_evt_cb, "Nodes");
     menu_add_button(cont_row, button3_evt_cb, "OnOff");
-    menu_add_button(cont_row, button4_evt_cb, "Groups");
+    menu_add_button(cont_row, button4_evt_cb, "Level");
+    menu_add_button(cont_row, button5_evt_cb, "HSL light");
 }

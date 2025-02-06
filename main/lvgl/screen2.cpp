@@ -8,8 +8,7 @@
 #include "mesh.h"
 #include "models.h"
 
-std::string provisioner_request_nodes_cb();
-static void lvgl_nodes_select_node(int addr);
+static void lvgl_nodes_select_node(uint16_t addr);
 const char* mesh_model_get_type(uint16_t id);
 void model_modal_mbox_open(uint16_t addr, uint16_t model);
 void mesh_node_reset_node(uint16_t addr);
@@ -25,11 +24,9 @@ static void screen_evt_cb(lv_event_t *ev)
     auto scr = (lv_obj_t *)lv_event_get_target(ev);
     if (code == LV_EVENT_SCREEN_LOADED)
     {
-        // printf("screen 2 loaded\n");
     }
     else if (code == LV_EVENT_SCREEN_UNLOADED)
     {
-        // printf("screen 2 unloaded\n");
         lv_obj_delete(scr);
     }
 }
@@ -42,11 +39,10 @@ static void select_event_cb(lv_event_t *e)
     lv_table_get_selected_cell(obj, &row, &col);
     if(row == 0) return;
     auto addr = lv_table_get_cell_value(obj, row, 0);
-    assert(addr);
-    lvgl_nodes_select_node(atoi(addr));
+    lvgl_nodes_select_node(strtol(addr, NULL, 16));
 }
 
-static void lvgl_nodes_select_node(int addr)
+static void lvgl_nodes_select_node(uint16_t addr)
 {
     lv_obj_clean(right_pane);
     esp_ble_mesh_node_t * node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
@@ -64,8 +60,7 @@ static void lvgl_nodes_select_node(int addr)
     lv_obj_set_flex_flow(cont_row, LV_FLEX_FLOW_COLUMN);
 
     auto label = lv_label_create(cont_row);
-    lv_label_set_text_fmt(label, "Address: %d", addr);
-    int offsY = 60;
+    lv_label_set_text_fmt(label, "Address: 0x%04X", addr);
     for (size_t i = 0; i < comp.element_num; i++)
     {
         auto btn = lv_button_create(cont_row);
@@ -149,9 +144,9 @@ void lvgl_screen2()
     right_pane = lv_obj_create(screen);
 
     lv_obj_set_pos(left_pane, 0, 100);
-    lv_obj_set_pos(right_pane, LV_PCT(50), 100);
-    lv_obj_set_size(left_pane, LV_PCT(50), LV_PCT(100));
-    lv_obj_set_size(right_pane, LV_PCT(50), LV_PCT(100));
+    lv_obj_set_pos(right_pane, LV_PCT(60), 100);
+    lv_obj_set_size(left_pane, LV_PCT(60), LV_PCT(100));
+    lv_obj_set_size(right_pane, LV_PCT(40), LV_PCT(100));
 
     auto count = BLEmeshProvisioner::GetInstance()->nodesCount();
     auto nodes = BLEmeshProvisioner::GetInstance()->getNodes();
@@ -161,14 +156,14 @@ void lvgl_screen2()
     /*Set a smaller height to the table. It'll make it scrollable*/
     lv_obj_set_size(table, LV_PCT(100), LV_SIZE_CONTENT);
 
-    lv_table_set_column_width(table, 0, 120);
-    lv_table_set_column_width(table, 1, 120);
+    lv_table_set_column_width(table, 0, 150);
+    lv_table_set_column_width(table, 1, 150);
     lv_table_set_column_width(table, 2, LV_SIZE_CONTENT);
     // lv_table_set_row_count(table, count); /*Not required but avoids a lot of memory reallocation lv_table_set_set_value*/
     lv_table_set_column_count(table, 3);
     lv_obj_remove_style(table, NULL, LV_PART_ITEMS | LV_STATE_PRESSED);
-    lv_table_set_cell_value(table, 0, 0, "Addr");
-    lv_table_set_cell_value(table, 0, 1, "Elem");
+    lv_table_set_cell_value(table, 0, 0, "Address");
+    lv_table_set_cell_value(table, 0, 1, "Elements");
     lv_table_set_cell_value(table, 0, 2, "Name");
 
     auto n = 1;
@@ -177,7 +172,7 @@ void lvgl_screen2()
         auto node = nodes[i];
         if(node)
         {
-            lv_table_set_cell_value_fmt(table, n, 0, "%d", node->unicast_addr);
+            lv_table_set_cell_value_fmt(table, n, 0, "0x%04X", node->unicast_addr);
             lv_table_set_cell_value_fmt(table, n, 1, "%d", node->element_num);
             lv_table_set_cell_value_fmt(table, n, 2, "%s", strlen(node->name) ? node->name : "node");
             n++;

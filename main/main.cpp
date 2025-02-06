@@ -4,7 +4,7 @@
 #include "lvgl.h"
 
 void init_ble_mesh();
-void lvgl_top_menu(lv_obj_t *scr);
+void lvgl_top_menu();
 
 extern "C"
 void app_main(void)
@@ -25,7 +25,7 @@ void app_main(void)
 
     bsp_display_lock(0);
 
-    lvgl_top_menu(NULL);
+    lvgl_top_menu();
     bsp_display_unlock();
 
     init_ble_mesh();

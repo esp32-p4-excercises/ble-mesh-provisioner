@@ -23,7 +23,8 @@ Since its easy to control mesh nodes by default mesh is with persistent store da
 ## Models
 All models should be possible to bind with app key 0 and subscribed to group address. Only few types has its own controls:
 - [x] on/off model
-- [ ] level model
+- [x] level model
+- [x] light HSL model
 - [ ] position model
 - [ ] scenes
 
@@ -42,6 +43,7 @@ To make this demo more complex here is list of todo features:
 ## Issues
 There is one small issue with `esp_hosted` component:
 - `35 | #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)` - the fix i am using now is to change this line with `#if 1`
+
 Also esp-idf is not compatible with C++ in `net.h:475`
 ```
 struct bt_mesh_net_rx rx = { .ctx.recv_rssi = rssi };

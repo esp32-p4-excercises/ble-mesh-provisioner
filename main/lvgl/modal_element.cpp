@@ -115,7 +115,7 @@ static void add_subscribe_menu(lv_obj_t* parent)
         for (size_t k = 0; k < 3; k++)
         {
             auto sub_adr = el.models[j].subs[k];
-            if (sub_adr)
+            if (sub_adr and el.models[j].mod_id == model_id)
             {
                 auto click1 = [](lv_event_t* ev)
                 {
@@ -142,13 +142,17 @@ static void add_model_action(lv_obj_t* parent)
     switch (model_id)
     {
     case 0x1000:{
-        model_1000_modal_action(parent, address);
+        model_1000_modal_action(parent, address, false);
         break;
+    }
     case 0x1002:{
-        model_1002_modal_action(parent, address);
+        model_1002_modal_action(parent, address, false);
         break;
     }
-    }
+    case 0x1307:{
+        model_1307_modal_action(parent, address, false);
+        break;
+    }    
     default:
         ESP_LOGW("", "Model action not implemented");
         break;
@@ -199,7 +203,6 @@ void model_modal_mbox_open(uint16_t addr, uint16_t model)
 
 void lvgl_modal_update_subs()
 {
-
     bsp_display_lock(0);
     lv_obj_delete(sub_cont);
     add_subscribe_menu(main_box_cont);

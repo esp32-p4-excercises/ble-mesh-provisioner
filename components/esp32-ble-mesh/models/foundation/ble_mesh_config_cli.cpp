@@ -19,7 +19,7 @@ void BLEmeshConfigCli::getState(esp_ble_mesh_opcode_t opcode, uint16_t addr, esp
     esp_err_t err = esp_ble_mesh_config_client_get_state(&common, get_state);
     if (err)
     {
-        ESP_LOGE("TAG1", "%s:%d failed, opcode: 0x%04lx: %d", __FILE__, __LINE__, opcode, err);
+        ESP_LOGE("TAG1", "%s:%d failed, opcode: 0x%04lx: %d", __FILE__, __LINE__, opcode, esp_err_to_name(err));
     }
 }
 

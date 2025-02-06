@@ -14,6 +14,7 @@ extern "C"
 #include "ble_mesh_provisioner.h"
 #include "generic_on_off_models.h"
 #include "generic_level_models.h"
+#include "ble_mesh_light_hsl_models.h"
 
 static void mesh_composition_data_parse(uint16_t addr);
 extern "C" void nvs_dump(const char *partName);
@@ -31,6 +32,11 @@ class ConfigCliCB : public BLEmeshModelCb
 };
 
 class GenericCliCB : public BLEmeshModelCb
+{
+    virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
+};
+
+class HSLcliCb : public BLEmeshModelCb
 {
     virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
 };
@@ -71,6 +77,9 @@ void init_ble_mesh()
     provisioner = BLEmeshProvisioner::GetInstance();
     auto levelCli = new GenericLevelCliModel("level cli");
     provisioner->addPrimaryModel(levelCli);
+    auto hslCli = new LightHSLCliModel("");
+    provisioner->addPrimaryModel(hslCli);
+    hslCli->setCb(new HSLcliCb());
 
     // when all models are added
     provisioner->init_ble();
@@ -89,6 +98,8 @@ void init_ble_mesh()
     onoffCli->keys(0, 0); // hardcoded
     levelCli->bindLocalAppKey();
     levelCli->keys(0, 0); // hardcoded
+    hslCli->bindLocalAppKey();
+    hslCli->keys(0, 0); // hardcoded
 
     auto count = provisioner->nodesCount();
     auto nodes = provisioner->getNodes();
@@ -117,7 +128,7 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
     auto unicast_addr = param->params->ctx.addr;
     auto node = esp_ble_mesh_provisioner_get_node_with_addr(unicast_addr);
     printf("\t\tCB: 0x%04lx\n", opcode);
-    if(event == ESP_BLE_MESH_CFG_CLIENT_TIMEOUT_EVT)
+    if (event == ESP_BLE_MESH_CFG_CLIENT_TIMEOUT_EVT)
     {
         auto opcode = param->params->opcode;
         switch (opcode)
@@ -125,7 +136,6 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
         case ESP_BLE_MESH_MODEL_OP_NODE_RESET:
             esp_ble_mesh_provisioner_delete_node_with_addr(unicast_addr);
             break;
-        
         default:
             ESP_LOGW("", "CLI timeout not handled opcode: 0x%04x", opcode);
             break;
@@ -159,29 +169,31 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
         auto element_addr = model_sub_status.element_addr;
         auto company_id = model_sub_status.company_id;
         auto model_id = model_sub_status.model_id;
-        if(status) return;
+        if (status)
+            return;
         auto node = mesh_get_composition(element_addr);
         for (size_t i = 0; i < node->element_num; i++)
         {
-            auto&& el = node->elements[i];
+            auto &&el = node->elements[i];
             for (size_t j = 0; j < el.count; j++)
             {
-                if(el.models[j].mod_id != model_id or element_addr != el.elem_addr) continue;
-                auto&& model = el.models[j];
+                if (el.models[j].mod_id != model_id or element_addr != el.elem_addr)
+                    continue;
+                auto &&model = el.models[j];
                 bool remove = false;
                 for (size_t k = 0; k < 3; k++)
                 {
-                    if(model.subs[k] == sub_addr)
+                    if (model.subs[k] == sub_addr)
                     {
                         model.subs[k] = 0;
                         remove = true;
                     }
                 }
-                if(!remove)
+                if (!remove)
                 {
                     for (size_t k = 0; k < 3; k++)
                     {
-                        if(model.subs[k] == 0)
+                        if (model.subs[k] == 0)
                         {
                             printf("3: 0x%04x\n", sub_addr);
                             model.subs[k] = sub_addr;
@@ -208,12 +220,11 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
         auto len = net_buf->len;
         ESP_LOG_BUFFER_HEX("", data, len);
         auto comp = mesh_get_composition(element_addr);
-        printf("\t\t\t ELEM: %d / %d\n", element_addr - unicast_addr, len);
         for (size_t i = 0; i < comp->element_num; i++)
         {
             if (comp->elements[i].elem_addr != element_addr)
                 continue;
-            auto&& el = comp->elements[i];
+            auto &&el = comp->elements[i];
             for (size_t j = 0; j < el.count; j++)
             {
                 if (el.models[j].mod_id != model_id)
@@ -222,7 +233,6 @@ void ConfigCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode,
                 {
                     uint16_t sub_adr = ((uint16_t *)data)[k];
                     el.models[j].subs[k] = sub_adr;
-                    printf("\tstatus: %d, len: %d, SUB: 0x%04x\n", status, k, sub_adr);
                 }
             }
         }
@@ -276,15 +286,16 @@ void mesh_model_sub_add(uint16_t addr, uint16_t sub, uint16_t model_id)
     auto node = mesh_get_composition(addr);
     for (size_t i = 0; i < node->element_num; i++)
     {
-        auto&& el = node->elements[i];
+        auto &&el = node->elements[i];
         for (size_t j = 0; j < el.count; j++)
         {
-            if(el.models[j].mod_id != model_id or addr != el.elem_addr) continue;
-            auto&& model = el.models[j];
+            if (el.models[j].mod_id != model_id or addr != el.elem_addr)
+                continue;
+            auto &&model = el.models[j];
             bool remove = false;
             for (size_t k = 0; k < 3; k++)
             {
-                if(model.subs[k] == sub)
+                if (model.subs[k] == sub)
                 {
                     return;
                 }
@@ -303,11 +314,11 @@ void mesh_model_sub_del(uint16_t addr, uint16_t sub, uint16_t model_id)
 
 void mesh_node_reset_node(uint16_t addr)
 {
-    esp_ble_mesh_node_t* node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
+    esp_ble_mesh_node_t *node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
     provisioner->configCli()->nodeReset(addr);
 }
 
-void onoff_client_publish(uint16_t addr, bool on)
+void mesh_model_set_onoff(uint16_t addr, bool on)
 {
     auto model = (GenericOnOffCliModel *)provisioner->findModel(0x1001);
     assert(model);
@@ -326,13 +337,13 @@ void mesh_model_get_onoff(uint16_t addr)
 
 void mesh_model_get_level(uint16_t address)
 {
-    auto model = (GenericLevelCliModel*)provisioner->findModel(0x1003);
+    auto model = (GenericLevelCliModel *)provisioner->findModel(0x1003);
     model->level(address);
 }
 
 void mesh_model_set_level(uint16_t addr, int lvl)
 {
-    auto model = (GenericLevelCliModel*)provisioner->findModel(0x1003);
+    auto model = (GenericLevelCliModel *)provisioner->findModel(0x1003);
     model->level(addr, lvl);
 }
 
@@ -340,7 +351,8 @@ static void mesh_composition_data_parse(uint16_t addr)
 {
     esp_ble_mesh_node_t *node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
     ble_mesh_comp_t comp = {};
-    if(!node->comp_length) return;
+    if (!node->comp_length)
+        return;
     comp.comp_length = node->comp_length;
     comp.cid = *(uint16_t *)node->comp_data;
     comp.node_addr = addr;
@@ -379,15 +391,15 @@ static void mesh_composition_data_parse(uint16_t addr)
     nodes_comp[addr] = comp;
 }
 
-ble_mesh_comp_t* mesh_get_composition(uint16_t addr)
+ble_mesh_comp_t *mesh_get_composition(uint16_t addr)
 {
-    for (auto&& node : nodes_comp)
+    for (auto &&node : nodes_comp)
     {
         for (size_t i = 0; i < node.second.element_num; i++)
         {
             if (node.second.elements[i].elem_addr == addr)
             {
-                return (ble_mesh_comp_t*)&node.second;
+                return (ble_mesh_comp_t *)&node.second;
             }
         }
     }
@@ -445,6 +457,15 @@ const char *mesh_model_get_type(uint16_t id)
         return "light hsl server";
     case 0x1309:
         return "light hsl client";
+    case 0x1301:
+        return "light lightness setup";
+    case 0x1308:
+        return "light hsl setup";
+    case 0x130a:
+        return "light hsl hue";
+    case 0x130b:
+        return "light hsl saturation";
+
     default:
         return "not supported";
     }
@@ -456,12 +477,11 @@ void GenericCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode
     auto param = (esp_ble_mesh_generic_client_cb_param_t *)params;
     auto unicast_addr = param->params->ctx.addr;
     auto node = esp_ble_mesh_provisioner_get_node_with_addr(unicast_addr);
-    if(event == ESP_BLE_MESH_CFG_CLIENT_TIMEOUT_EVT)
+    if (event == ESP_BLE_MESH_CFG_CLIENT_TIMEOUT_EVT)
     {
         auto _opcode = param->params->opcode;
         switch (opcode)
         {
-        
         default:
             ESP_LOGW("", "level CLI timeout not handled opcode: 0x%04x", opcode);
             break;
@@ -471,32 +491,66 @@ void GenericCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode
 
     switch (opcode)
     {
-        case ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_STATUS:{
-            auto level_status = param->status_cb.level_status;
-            auto present_level = level_status.present_level;
-            if(0)
-            {
-                auto target_level = level_status.target_level;
-                auto remain_time = level_status.remain_time;
-            }
-            bsp_display_lock(0);
-            lvgl_slider_update_level(unicast_addr, present_level);
-            bsp_display_unlock();
+    case ESP_BLE_MESH_MODEL_OP_GEN_LEVEL_STATUS:
+    {
+        auto level_status = param->status_cb.level_status;
+        auto present_level = level_status.present_level;
+        bsp_display_lock(0);
+        lvgl_slider_update_level(unicast_addr, present_level);
+        bsp_display_unlock();
 
-            break;
-        }
-        case ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS:{
-            auto onoff_status = param->status_cb.onoff_status;
-            auto present_onoff = onoff_status.present_onoff;
+        break;
+    }
+    case ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS:
+    {
+        auto onoff_status = param->status_cb.onoff_status;
+        auto present_onoff = onoff_status.present_onoff;
 
-            bsp_display_lock(0);
-            lvgl_update_onoff_btn(unicast_addr, present_onoff);
-            bsp_display_unlock();
+        bsp_display_lock(0);
+        lvgl_update_onoff_btn(unicast_addr, present_onoff);
+        bsp_display_unlock();
 
-            break;
-        }
+        break;
+    }
     default:
         ESP_LOGW("", "%s:%d, OP code: 0x%04lx", __func__, __LINE__, opcode);
         break;
     }
+}
+void lvgl_update_hue_sliders(uint16_t hue, uint16_t sat, uint16_t light);
+
+void HSLcliCb::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params)
+{
+    ESP_LOGW("HSL", "event %d with opcode: 0x%04X", event, opcode);
+    esp_ble_mesh_light_client_cb_param_t *param = (esp_ble_mesh_light_client_cb_param_t *)params;
+
+    if (event != ESP_BLE_MESH_LIGHT_CLIENT_GET_STATE_EVT)
+        return;
+    switch (opcode)
+    {
+    case ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_STATUS:
+    {
+        auto lightness = param->status_cb.hsl_status.hsl_lightness;
+        auto hue = param->status_cb.hsl_status.hsl_hue;
+        auto saturation = param->status_cb.hsl_status.hsl_saturation;
+        bsp_display_lock(0);
+        lvgl_update_hue_sliders(hue, saturation, lightness);
+        bsp_display_unlock();
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void mesh_model_get_hsl(uint16_t address)
+{
+    LightHSLCliModel *hslCli = (LightHSLCliModel *)provisioner->findModel(0x1309);
+    hslCli->getHSL(address);
+}
+
+void mesh_model_set_hsl(uint16_t addr, uint16_t hue, uint16_t sat, uint16_t light)
+{
+    LightHSLCliModel *hslCli = (LightHSLCliModel *)provisioner->findModel(0x1309);
+    hslCli->setHSL(hue, sat, light, addr);
 }

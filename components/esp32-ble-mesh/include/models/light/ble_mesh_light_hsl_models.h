@@ -186,7 +186,7 @@ public:
         return esp_ble_mesh_register_light_client_callback(callback);
     }
 
-    void setHSL(uint16_t hue, uint16_t sat, uint16_t light)
+    void setHSL(uint16_t hue, uint16_t sat, uint16_t light, uint16_t addr)
     {
         esp_ble_mesh_client_common_param_t common = {};
         auto ctx = getCtx();
@@ -195,7 +195,7 @@ public:
         common.model = _model;
         common.ctx.net_idx = ctx->net_idx;
         common.ctx.app_idx = ctx->app_idx;
-        // common.ctx.addr = addr;
+        common.ctx.addr = addr;
         common.ctx.send_ttl = ctx->send_ttl;
         common.msg_timeout = 0; /* 0 indicates that timeout value from menuconfig will be used */
 
@@ -209,7 +209,30 @@ public:
         esp_err_t err = esp_ble_mesh_light_client_set_state(&common, &set);
         if (err)
         {
-            ESP_LOGE("TAG", "Send Generic OnOff Set Unack failed");
+            ESP_LOGE("TAG", "Send Generic ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_SET_UNACK Set Unack failed: %s", esp_err_to_name(err));
+            return;
+        }
+    }
+
+    void getHSL(uint16_t addr)
+    {
+        esp_ble_mesh_client_common_param_t common = {};
+        auto ctx = getCtx();
+
+        common.opcode = ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_GET;
+        common.model = _model;
+        common.ctx.net_idx = ctx->net_idx;
+        common.ctx.app_idx = ctx->app_idx;
+        common.ctx.addr = addr;
+        common.ctx.send_ttl = ctx->send_ttl;
+        common.msg_timeout = 0; /* 0 indicates that timeout value from menuconfig will be used */
+
+        esp_ble_mesh_light_client_get_state_t get_state = {};
+
+        esp_err_t err = esp_ble_mesh_light_client_get_state(&common, &get_state);
+        if (err)
+        {
+            ESP_LOGE("TAG", "Send Generic ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_SET_UNACK Set Unack failed: %s", esp_err_to_name(err));
             return;
         }
     }
@@ -217,7 +240,7 @@ public:
     void onEvent(uint32_t event, uint32_t op_code, void* params) override {
         ESP_LOGD(__func__, "%s event: %ld, OP code: 0x%04lx\n", name(), event, op_code);
         if(cb)
-            cb->onEvent(this, event, params);
+            cb->onEvent(this, event, op_code, params);
 
         auto srv = ((esp_ble_mesh_lighting_server_cb_param_t*)params)->model->user_data;
         
