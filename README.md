@@ -1,3 +1,6 @@
+This branch is using espressif brookesia component as a main UX, which is really cool UI.
+Im not sure if its good idea, but for now i want to keep generic ON and OFF as a separate "apps", but in the future it may be better to use previous design with on and off buttons in the same place.
+
 ## Description
 This is demo of ble mesh provisioner on esp32 P4. As such it has some limitations and some values are hardcoded. In theory it should works on esp32 S3 or other ble mesh capable, but not tested.
 Provisioner has been tested with 10x esp32-s3 mesh nodes with mixed model types.
