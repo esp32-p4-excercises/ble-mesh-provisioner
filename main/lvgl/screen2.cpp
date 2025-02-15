@@ -36,7 +36,7 @@ static void lvgl_nodes_select_node(uint16_t addr)
 	if (comp.element_num == 0)
 	{
 		mesh_node_get_comp_data(addr);
-		return;
+		// return;
 	}
 
 	auto label = lv_label_create(right_pane);

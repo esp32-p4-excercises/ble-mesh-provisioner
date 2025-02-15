@@ -127,7 +127,7 @@ static bool screen()
 				{
 					auto btn = lv_btn_create(container);
 					auto lbl = lv_label_create(btn);
-					lv_label_set_text_fmt(lbl, "0x%04X\n Level", addr);
+					lv_label_set_text_fmt(lbl, "0x%04X\n Level", elem.elem_addr);
 					auto click = [](lv_event_t *ev)
 					{
 						auto addr = (uint32_t)lv_event_get_user_data(ev) & 0xffff;
@@ -135,7 +135,7 @@ static bool screen()
 						level = lv_slider_get_value(slider_level);
 						mesh_model_set_level(addr, level);
 					};
-					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(addr + j));
+					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(elem.elem_addr));
 				}
 			}
 		}

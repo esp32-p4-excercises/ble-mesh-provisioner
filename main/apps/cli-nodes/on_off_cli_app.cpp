@@ -120,14 +120,14 @@ static bool screen(uint8_t lvl)
 				{
 					auto btn = lv_btn_create(container);
 					auto lbl = lv_label_create(btn);
-					lv_label_set_text_fmt(lbl, "0x%04X\n%s", addr, lvl ? "On" : "Off");
+					lv_label_set_text_fmt(lbl, "0x%04X\n%s", elem.elem_addr, lvl ? "On" : "Off");
 					auto click = [](lv_event_t *ev)
 					{
 						auto addr = (uint32_t)lv_event_get_user_data(ev) & 0xffff;
 						auto lvl = (uint32_t)lv_event_get_user_data(ev) >> 16;
 						mesh_model_set_onoff(addr, lvl);
 					};
-					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(addr + j + (lvl << 16)));
+					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(elem.elem_addr + (lvl << 16)));
 				}
 			}
 		}
