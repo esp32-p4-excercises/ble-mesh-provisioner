@@ -16,8 +16,10 @@ Working features:
     - subscribe to group address (3 hardcoded groups possible 0xC000-0xC002)
     - view and remove subscribed groups - after reset esp32-p4 info about subs is lost, but nodes still keep that info
     - perform action per model type (on/off, level etc)
-- list on/off models and control its state
-- control on/off state with group address
+- list models and control its state, also possible to control state with group address
+    - on/off server
+    - level server
+    - hsl server light
 - option to control nodes with mqtt - TBD
 
 Tested on esp-idf v5.5+ commit 0f0068fff3ab159f082133aadfa9baf4fc0c7b8d

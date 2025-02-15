@@ -237,6 +237,25 @@ public:
         }
     }
 
+    void publish(uint16_t hue, uint16_t sat, uint16_t light, uint16_t addr)
+	{
+		esp_ble_mesh_client_common_param_t common = {};
+
+		esp_ble_mesh_light_client_set_state_t set = {};
+		set.hsl_set.op_en = false;
+		set.hsl_set.hsl_hue = hue;
+		set.hsl_set.hsl_saturation = sat;
+		set.hsl_set.hsl_lightness = light;
+		set.hsl_set.tid = tid++;
+
+		esp_err_t err = IBLEMeshModel::publish(ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_SET_UNACK, (uint8_t*)(&set.hsl_set.hsl_lightness), 7);
+		if (err)
+		{
+			ESP_LOGE("TAG", "Send HSL publish failed: %s", esp_err_to_name(err));
+			return;
+		}
+	}
+
     void onEvent(uint32_t event, uint32_t op_code, void* params) override {
         ESP_LOGD(__func__, "%s event: %ld, OP code: 0x%04lx\n", name(), event, op_code);
         if(cb)

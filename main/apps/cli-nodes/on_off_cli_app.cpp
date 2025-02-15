@@ -21,23 +21,14 @@ void mesh_model_set_onoff(uint16_t addr, bool on);
 static OnOffClientApp *on_cli_app = nullptr;
 static OnOffClientApp *off_cli_app = nullptr;
 
-void install_on_off_control_app(ESP_Brookesia_Phone *phone, uint8_t lvl)
+void install_on_off_control_app(ESP_Brookesia_Phone *phone)
 {
-	if (lvl)
-	{
-		on_cli_app = new OnOffClientApp("On", lvl);
-		ESP_BROOKESIA_CHECK_NULL_EXIT(on_cli_app, "Create On app failed");
-		ESP_BROOKESIA_CHECK_FALSE_EXIT((phone->installApp(on_cli_app) >= 0), "Install On app failed");
-	}
-	else
-	{
-		off_cli_app = new OnOffClientApp("Off", lvl);
-		ESP_BROOKESIA_CHECK_NULL_EXIT(off_cli_app, "Create Off app failed");
-		ESP_BROOKESIA_CHECK_FALSE_EXIT((phone->installApp(off_cli_app) >= 0), "Install Off app failed");
-	}
+	on_cli_app = new OnOffClientApp("On/Off");
+	ESP_BROOKESIA_CHECK_NULL_EXIT(on_cli_app, "Create On app failed");
+	ESP_BROOKESIA_CHECK_FALSE_EXIT((phone->installApp(on_cli_app) >= 0), "Install On app failed");
 }
 
-OnOffClientApp::OnOffClientApp(const char *name, uint8_t lvl) : ESP_Brookesia_PhoneApp(
+OnOffClientApp::OnOffClientApp(const char *name) : ESP_Brookesia_PhoneApp(
 																	{
 																		.name = name,
 																		.launcher_icon = ESP_BROOKESIA_STYLE_IMAGE(&esp_brookesia_image_small_app_launcher_default_98_98),
@@ -68,7 +59,6 @@ OnOffClientApp::OnOffClientApp(const char *name, uint8_t lvl) : ESP_Brookesia_Ph
 																		},
 																	})
 {
-	level = lvl;
 }
 
 OnOffClientApp::~OnOffClientApp()
@@ -76,12 +66,7 @@ OnOffClientApp::~OnOffClientApp()
 	ESP_BROOKESIA_LOGD("Destroy(@0x%p)", this);
 }
 
-void OnOffClientApp::change(uint16_t addr)
-{
-	mesh_model_set_onoff(addr, level);
-}
-
-static bool screen(uint8_t lvl)
+static bool screen()
 {
 	auto container = lv_obj_create(lv_scr_act());
 	lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW_WRAP);
@@ -93,16 +78,27 @@ static bool screen(uint8_t lvl)
 
 	for (size_t k = 0; k < sizeof(models_id) / sizeof(uint16_t); k++)
 	{
-		auto btn = lv_btn_create(container);
-		auto lbl = lv_label_create(btn);
-		lv_label_set_text_fmt(lbl, "0x%04X\n%s", models_id[k], lvl ? "On" : "Off");
+		lv_obj_t *cont = lv_obj_create(container);
+		lv_obj_set_size(cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+		lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+
+		auto lbl = lv_label_create(cont);
+		lv_label_set_text_fmt(lbl, "0x%04X", models_id[k]);
+		auto btn = lv_btn_create(cont);
+		lbl = lv_label_create(btn);
+		lv_label_set_text(lbl, "On");
 		auto click = [](lv_event_t *ev)
 		{
 			auto addr = (uint32_t)lv_event_get_user_data(ev);
 			auto lvl = (uint32_t)lv_event_get_user_data(ev) >> 16;
 			mesh_model_set_onoff(addr, lvl);
 		};
-		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(models_id[k] + (lvl << 16)));
+		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(models_id[k] + (1 << 16)));
+
+		btn = lv_btn_create(cont);
+		lbl = lv_label_create(btn);
+		lv_label_set_text(lbl, "Off");
+		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(models_id[k] + (0 << 16)));
 	}
 
 	for (size_t i = 0; i < CONFIG_BLE_MESH_MAX_PROV_NODES; i++)
@@ -118,16 +114,27 @@ static bool screen(uint8_t lvl)
 			{
 				if (elem.models[k].mod_id == 0x1000)
 				{
-					auto btn = lv_btn_create(container);
-					auto lbl = lv_label_create(btn);
-					lv_label_set_text_fmt(lbl, "0x%04X\n%s", elem.elem_addr, lvl ? "On" : "Off");
+					lv_obj_t *cont = lv_obj_create(container);
+					lv_obj_set_size(cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+					lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+
+					auto lbl = lv_label_create(cont);
+					lv_label_set_text_fmt(lbl, "0x%04X", elem.elem_addr);
+					auto btn = lv_btn_create(cont);
+					lbl = lv_label_create(btn);
+					lv_label_set_text(lbl, "On");
 					auto click = [](lv_event_t *ev)
 					{
-						auto addr = (uint32_t)lv_event_get_user_data(ev) & 0xffff;
+						auto addr = (uint32_t)lv_event_get_user_data(ev);
 						auto lvl = (uint32_t)lv_event_get_user_data(ev) >> 16;
 						mesh_model_set_onoff(addr, lvl);
 					};
-					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(elem.elem_addr + (lvl << 16)));
+					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(elem.elem_addr + (1 << 16)));
+
+					btn = lv_btn_create(cont);
+					lbl = lv_label_create(btn);
+					lv_label_set_text(lbl, "Off");
+					lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void *)(elem.elem_addr + (0 << 16)));
 				}
 			}
 		}
@@ -142,7 +149,7 @@ bool OnOffClientApp::run(void)
 	ESP_BROOKESIA_LOGD("Run");
 
 	// Create all UI resources here
-	ESP_BROOKESIA_CHECK_FALSE_RETURN(screen(level), true, "Main init failed");
+	ESP_BROOKESIA_CHECK_FALSE_RETURN(screen(), true, "Main init failed");
 
 	return true;
 }

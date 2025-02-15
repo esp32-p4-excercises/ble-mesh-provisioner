@@ -2,7 +2,7 @@
 #include "lvgl.h"
 #include "mesh.h"
 
-static uint16_t models_id[] = {0xc000, 0xc001, 0xc002, 0xfffc, 0xfffd, 0xfffe, 0xffff};
+static uint16_t models_id[] = {0xc000, 0xc001, 0xc002, 0xffff};
 
 ble_mesh_comp_t *mesh_get_composition(uint16_t addr);
 

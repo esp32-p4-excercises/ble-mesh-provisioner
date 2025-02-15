@@ -62,13 +62,33 @@ static void add_bind_menu(lv_obj_t *parent)
 	lv_obj_add_event_cb(btn, element_unbind_cb, LV_EVENT_SHORT_CLICKED, 0);
 }
 
+void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id);
 static void add_publish_menu(lv_obj_t *parent)
 {
 	auto mbox = lv_msgbox_create(parent, "Publish", NULL, NULL, false);
 	lv_obj_set_width(mbox, LV_PCT(100));
 	auto box_c = lv_msgbox_get_content(mbox);
-	auto label = lv_label_create(box_c);
-	lv_label_set_text(label, "Not implemented yet");
+	lv_obj_set_flex_flow(box_c, LV_FLEX_FLOW_ROW_WRAP);
+
+	auto add_btn = [](lv_obj_t* parent, uint16_t pub_addr)
+	{
+		auto click = [](lv_event_t *ev){
+			uint16_t addr = (uint32_t)lv_event_get_user_data(ev);
+			mesh_model_set_publish(address, addr, model_id);
+		};
+	
+		auto btn = lv_btn_create(parent);
+		auto lbl = lv_label_create(btn);
+		lv_obj_set_size(btn, 100, LV_SIZE_CONTENT);
+		lv_label_set_text_fmt(lbl, "0x%04X", pub_addr);
+		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void*)pub_addr);
+	};
+
+	add_btn(box_c, 0xc000);
+	add_btn(box_c, 0xc001);
+	add_btn(box_c, 0xc002);
+	add_btn(box_c, 0xffff);
+
 }
 
 static void add_subscribe_menu(lv_obj_t *parent)

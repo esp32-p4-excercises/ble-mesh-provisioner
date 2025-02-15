@@ -13,21 +13,18 @@
  *
  */
 class OnOffClientApp: public ESP_Brookesia_PhoneApp {
-	uint8_t level = 0;
 public:
 	/**
 	 * @brief Construct a app with basic configuration
 	 *
 	 */
-	OnOffClientApp(const char *name, uint8_t lvl);
+	OnOffClientApp(const char *name);
 
 	/**
 	 * @brief Destructor for the phone app
 	 *
 	 */
 	~OnOffClientApp();
-
-	void change(uint16_t addr);
 
 protected:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

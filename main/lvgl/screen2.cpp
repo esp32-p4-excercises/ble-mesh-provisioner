@@ -158,7 +158,7 @@ void refresh_all_nodes()
 	}
 }
 
-void lvgl_screen2()
+bool lvgl_screen2()
 {
 	lv_style_init(&style);
 	lv_style_set_pad_left(&style, 5);
@@ -180,4 +180,5 @@ void lvgl_screen2()
 	lv_obj_set_flex_flow(left_pane, LV_FLEX_FLOW_COLUMN);
 
 	refresh_all_nodes();
+	return true;
 }

@@ -86,7 +86,7 @@ void init_ble_mesh()
 	// when ble mesh is init
 	provisioner->registerCallbacks();
 	provisioner->selfProvisioning();
-	provisioner->enableProvisioning(ESP_BLE_MESH_PROV_GATT);
+	provisioner->enableProvisioning();
 
 	provisioner->configCli()->setCb(new ConfigCliCB());
 	auto genericCb = new GenericCliCB();
@@ -323,9 +323,9 @@ void mesh_model_set_onoff(uint16_t addr, bool on)
 	auto model = (GenericOnOffCliModel *)provisioner->findModel(0x1001);
 	assert(model);
 	if (on)
-		model->turnOn(addr, true);
+		model->turnOn(addr, addr < 0xc000);
 	else
-		model->turnOff(addr, true);
+		model->turnOff(addr, addr < 0xc000);
 }
 
 void mesh_model_get_onoff(uint16_t addr)
@@ -553,4 +553,19 @@ void mesh_model_set_hsl(uint16_t addr, uint16_t hue, uint16_t sat, uint16_t ligh
 {
 	LightHSLCliModel *hslCli = (LightHSLCliModel *)provisioner->findModel(0x1309);
 	hslCli->setHSL(hue, sat, light, addr);
+}
+
+/**
+ * @brief 
+ * 
+ * @param addr model element address
+ * @param pub_addr publish to address
+ * @param model_id own model_id
+ */
+void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id)
+{
+	ble_mesh_comp_t *comp = mesh_get_composition(addr);
+	auto address = comp->node_addr;
+
+	provisioner->configCli()->modelPubSet(address, addr, pub_addr, 0, 0, 0xff, 0, 0, model_id);
 }
