@@ -82,13 +82,15 @@ static void add_publish_menu(lv_obj_t *parent)
 		lv_obj_set_size(btn, 100, LV_SIZE_CONTENT);
 		lv_label_set_text_fmt(lbl, "0x%04X", pub_addr);
 		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void*)pub_addr);
+		return lbl;
 	};
 
 	add_btn(box_c, 0xc000);
 	add_btn(box_c, 0xc001);
 	add_btn(box_c, 0xc002);
 	add_btn(box_c, 0xffff);
-
+	auto lbl = add_btn(box_c, 0);
+	lv_label_set_text(lbl, "Clear");
 }
 
 static void add_subscribe_menu(lv_obj_t *parent)
