@@ -15,6 +15,8 @@ extern "C"
 #include "generic_on_off_models.h"
 #include "generic_level_models.h"
 #include "ble_mesh_light_hsl_models.h"
+#include "generic_location_models.h"
+#include "ble_mesh_time_models.h"
 
 static void mesh_composition_data_parse(uint16_t addr);
 extern "C" void nvs_dump(const char *partName);
@@ -36,6 +38,16 @@ class GenericCliCB : public BLEmeshModelCb
 };
 
 class HSLcliCb : public BLEmeshModelCb
+{
+	virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
+};
+
+class LocationCb : public BLEmeshModelCb
+{
+	virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
+};
+
+class TimeCb : public BLEmeshModelCb
 {
 	virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) override;
 };
@@ -73,11 +85,16 @@ void init_ble_mesh()
 	auto onoffCli = new GenericOnOffCliModel("on-off cli");
 	provisioner->addPrimaryModel(onoffCli);
 
-	provisioner = BLEmeshProvisioner::GetInstance();
 	auto levelCli = new GenericLevelCliModel("level cli");
 	provisioner->addPrimaryModel(levelCli);
 	auto hslCli = new LightHSLCliModel("");
 	provisioner->addPrimaryModel(hslCli);
+
+	auto location = new GenericLocationCliModel("location");
+	provisioner->addPrimaryModel(location);
+
+	auto time_model = new BLEmeshTimeCli("time");
+	provisioner->addPrimaryModel(time_model);
 
 	// when all models are added
 	provisioner->init_ble();
@@ -93,12 +110,18 @@ void init_ble_mesh()
 	levelCli->setCb(genericCb);
 	onoffCli->setCb(genericCb);
 	hslCli->setCb(new HSLcliCb());
+	location->setCb(new LocationCb());
+	time_model->setCb(new TimeCb());
 	onoffCli->bindLocalAppKey();
 	levelCli->bindLocalAppKey();
 	hslCli->bindLocalAppKey();
+	location->bindLocalAppKey();
+	time_model->bindLocalAppKey();
 	onoffCli->keys(0, 0); // hardcoded
 	levelCli->keys(0, 0); // hardcoded
-	hslCli->keys(0, 0); // hardcoded
+	hslCli->keys(0, 0);	  // hardcoded
+	location->keys(0, 0);
+	time_model->keys(0, 0);
 
 	auto count = provisioner->nodesCount();
 	auto nodes = provisioner->getNodes();
@@ -517,15 +540,15 @@ void GenericCliCB::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode
 		break;
 	}
 }
-void lvgl_update_hue_sliders(uint16_t hue, uint16_t sat, uint16_t light);
+void lvgl_update_hue_sliders(uint16_t addr, uint16_t hue, uint16_t sat, uint16_t light);
 
 void HSLcliCb::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params)
 {
 	ESP_LOGW("HSL", "event %d with opcode: 0x%04X", event, opcode);
 	esp_ble_mesh_light_client_cb_param_t *param = (esp_ble_mesh_light_client_cb_param_t *)params;
 
-	if (event != ESP_BLE_MESH_LIGHT_CLIENT_GET_STATE_EVT)
-		return;
+	// if (event != ESP_BLE_MESH_LIGHT_CLIENT_GET_STATE_EVT)
+	// 	return;
 	switch (opcode)
 	{
 	case ESP_BLE_MESH_MODEL_OP_LIGHT_HSL_STATUS:
@@ -533,8 +556,9 @@ void HSLcliCb::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, vo
 		auto lightness = param->status_cb.hsl_status.hsl_lightness;
 		auto hue = param->status_cb.hsl_status.hsl_hue;
 		auto saturation = param->status_cb.hsl_status.hsl_saturation;
+		auto source_adr = param->params->ctx.addr;
 		bsp_display_lock(0);
-		lvgl_update_hue_sliders(hue, saturation, lightness);
+		lvgl_update_hue_sliders(source_adr, hue, saturation, lightness);
 		bsp_display_unlock();
 		break;
 	}
@@ -556,16 +580,74 @@ void mesh_model_set_hsl(uint16_t addr, uint16_t hue, uint16_t sat, uint16_t ligh
 }
 
 /**
- * @brief 
- * 
+ * @brief
+ *
  * @param addr model element address
  * @param pub_addr publish to address
  * @param model_id own model_id
  */
-void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id)
+void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id, uint8_t ttl, uint8_t period, uint8_t retrans)
 {
 	ble_mesh_comp_t *comp = mesh_get_composition(addr);
 	auto address = comp->node_addr;
 
-	provisioner->configCli()->modelPubSet(address, addr, pub_addr, 0, 0, 0xff, 0, 0, model_id);
+	provisioner->configCli()->modelPubSet(address, addr, pub_addr, 0, 0, ttl, period, retrans, model_id);
+}
+
+void LocationCb::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params)
+{
+	ESP_LOGI(TAG, "model: %s, event: %d, opcode: 0x%04X", model->name(), event, opcode);
+	ESP_LOG_BUFFER_HEX(TAG, &((esp_ble_mesh_generic_client_cb_param_t*)params)->status_cb, 16);
+}
+
+void mesh_model_send_global_location(uint16_t addr, esp_ble_mesh_gen_location_state_t state)
+{
+	GenericLocationCliModel *model = (GenericLocationCliModel*)provisioner->findModel(ESP_BLE_MESH_MODEL_ID_GEN_LOCATION_CLI);
+	model->setGlobalLocation(addr, &state, true);
+}
+
+void mesh_model_send_local_location(uint16_t addr, esp_ble_mesh_gen_location_state_t state)
+{
+	GenericLocationCliModel *model = (GenericLocationCliModel*)provisioner->findModel(ESP_BLE_MESH_MODEL_ID_GEN_LOCATION_CLI);
+	model->setLocalLocation(addr, &state, true);
+}
+
+void TimeCb::onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params)
+{
+	ESP_LOGI(TAG, "model: %s, event: %d, opcode: 0x%04X", model->name(), event, opcode);
+	ESP_LOG_BUFFER_HEX(TAG, &((esp_ble_mesh_time_scene_client_cb_param_t*)params)->status_cb, 16);
+	auto param = (esp_ble_mesh_time_scene_client_cb_param_t*)params;
+	if (opcode == ESP_BLE_MESH_MODEL_OP_TIME_STATUS)
+	{
+		auto state = param->status_cb.time_status;
+		uint32_t sec = ((*(uint64_t*)state.tai_seconds) & 0xFFFFFFFF) + 946684800 + state.tai_utc_delta;
+		uint32_t us = state.sub_second * 1000 / 255.0;
+		sntp_set_system_time(sec, us);
+		setenv("TZ", "CET-1CEST", 1); // 1 means overwrite=true
+		tzset();
+	}
+}
+
+void mesh_model_send_time()
+{
+	esp_ble_mesh_time_set_t data = {
+		// .tai_seconds = {0x2F, 0x4E, 0xA3, 0x76, 0},
+		.sub_second = 10,
+		.uncertainty = 20,
+		.time_authority = 1,
+		.tai_utc_delta = 37 + 255,
+		.time_zone_offset = 64 + 4,
+	} ;
+
+	uint32_t sec;
+	uint32_t us;
+	sntp_get_system_time(&sec, &us);
+
+	uint32_t _t = sec;
+	if (sec > 946684800)
+		_t = sec - 946684800;
+	memcpy(data.tai_seconds, &_t, 4);
+
+	BLEmeshTimeCli *model = (BLEmeshTimeCli*)provisioner->findModel(ESP_BLE_MESH_MODEL_ID_TIME_CLI);
+	model->sendTime(0xffff, &data);
 }

@@ -99,7 +99,7 @@ void BLEmeshProvisioner::addUnprovisioned(std::string uuid)
     /* Note: If unprovisioned device adv packets have not been received, we should not add
              device with ADD_DEV_START_PROV_NOW_FLAG set. */
     esp_err_t err = esp_ble_mesh_provisioner_add_unprov_dev(&dev,
-                            (esp_ble_mesh_dev_add_flag_t)(ADD_DEV_RM_AFTER_PROV_FLAG));
+                            (esp_ble_mesh_dev_add_flag_t)(ADD_DEV_RM_AFTER_PROV_FLAG | ADD_DEV_START_PROV_NOW_FLAG | ADD_DEV_FLUSHABLE_DEV_FLAG));
     if (err)
     {
         ESP_LOGE(TAG, "%s: Add unprovisioned device into queue failed", __func__);

@@ -11,6 +11,7 @@ void mesh_model_sub_del(uint16_t addr, uint16_t sub, uint16_t model_id);
 void mesh_model_sub_get(uint16_t addr, uint16_t model_id);
 void mesh_model_app_key_bind(uint16_t addr, uint16_t model_id, uint8_t appIdx);
 void mesh_model_app_key_unbind(uint16_t addr, uint16_t model_id, uint8_t appIdx);
+void element_model_modal_publish(lv_obj_t *parent, uint16_t addr, uint16_t model_id);
 
 static uint16_t address;
 static uint16_t model_id;
@@ -62,7 +63,8 @@ static void add_bind_menu(lv_obj_t *parent)
 	lv_obj_add_event_cb(btn, element_unbind_cb, LV_EVENT_SHORT_CLICKED, 0);
 }
 
-void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id);
+void mesh_model_set_publish(uint16_t addr, uint16_t pub_addr, uint16_t model_id, uint8_t ttl, uint8_t period, uint8_t retrans);
+
 static void add_publish_menu(lv_obj_t *parent)
 {
 	auto mbox = lv_msgbox_create(parent, "Publish", NULL, NULL, false);
@@ -74,21 +76,23 @@ static void add_publish_menu(lv_obj_t *parent)
 	{
 		auto click = [](lv_event_t *ev){
 			uint16_t addr = (uint32_t)lv_event_get_user_data(ev);
-			mesh_model_set_publish(address, addr, model_id);
+			// mesh_model_set_publish(address, addr, model_id);
+			if(addr){
+				element_model_modal_publish(NULL, address, model_id);
+			} else {
+				mesh_model_set_publish(address, addr, model_id, 0, 0, 0);
+			}
 		};
 	
 		auto btn = lv_btn_create(parent);
 		auto lbl = lv_label_create(btn);
-		lv_obj_set_size(btn, 100, LV_SIZE_CONTENT);
-		lv_label_set_text_fmt(lbl, "0x%04X", pub_addr);
+		lv_obj_set_size(btn, 150, LV_SIZE_CONTENT);
+		lv_label_set_text_fmt(lbl, "Set publication");
 		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, (void*)pub_addr);
 		return lbl;
 	};
 
-	add_btn(box_c, 0xc000);
-	add_btn(box_c, 0xc001);
-	add_btn(box_c, 0xc002);
-	add_btn(box_c, 0xffff);
+	add_btn(box_c, 1);
 	auto lbl = add_btn(box_c, 0);
 	lv_label_set_text(lbl, "Clear");
 }
@@ -181,12 +185,16 @@ static void add_model_action(lv_obj_t *parent)
 }
 
 static lv_obj_t *container = nullptr;
-void model_modal_mbox_open(uint16_t addr, uint16_t model)
+void element_model_details(uint16_t addr, uint16_t model, lv_obj_t * parent)
 {
+	auto mb = lv_obj_get_child(parent, 0);
+	if(mb)
+		lv_obj_clean(parent);
+
 	bsp_display_lock(0);
 	address = addr;
 	model_id = model;
-	auto main_mbox = lv_msgbox_create(NULL, "Model actions", NULL, NULL, true);
+	auto main_mbox = lv_msgbox_create(parent, "Model actions", NULL, NULL, true);
 	lv_obj_set_size(main_mbox, LV_PCT(100), LV_SIZE_CONTENT);
 
 	lv_obj_add_event_cb(main_mbox, [](lv_event_t *e)
@@ -201,6 +209,8 @@ void model_modal_mbox_open(uint16_t addr, uint16_t model)
 
 	if (model == 0)
 	{
+		auto lbl = lv_label_create(container);
+		lv_label_set_text(lbl, "Not implemented yet");
 	}
 	else
 	{

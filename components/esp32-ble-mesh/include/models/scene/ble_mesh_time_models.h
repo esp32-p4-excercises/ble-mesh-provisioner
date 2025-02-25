@@ -172,7 +172,7 @@ public:
     {
         if (callback == NULL)
         {
-            return esp_ble_mesh_register_time_scene_client_callback(callback); /// @fixme
+            return esp_ble_mesh_register_time_scene_client_callback(_default_ble_mesh_time_scene_client_cb); /// @fixme
         }
 
         return esp_ble_mesh_register_time_scene_client_callback(callback);
@@ -182,6 +182,11 @@ public:
     // time_zone_set
     // tai_utc_delta_set
     // time_role_set
+    virtual void sendTime(uint16_t addr, esp_ble_mesh_time_set_t *data) {
+        auto ctx = getCtx();
+        ctx->addr = addr;
+        esp_ble_mesh_client_model_send_msg(_model, ctx, ESP_BLE_MESH_MODEL_OP_TIME_SET, sizeof(esp_ble_mesh_time_set_t), (uint8_t*)data, 0, false, ROLE_NODE);
+    }
     virtual void setTAI() {
     }
 
@@ -192,7 +197,7 @@ public:
     {
         ESP_LOGD(__func__, "%s event: %ld, OP code: 0x%04lx\n", name(), event, op_code);
         if(cb)
-            cb->onEvent(this, event, params);
+            cb->onEvent(this, event, op_code, params);
     }
 
 // esp_err_t esp_ble_mesh_time_scene_client_get_state(esp_ble_mesh_client_common_param_t *params, esp_ble_mesh_time_scene_client_get_state_t *get_state);

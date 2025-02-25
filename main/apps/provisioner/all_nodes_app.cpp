@@ -6,6 +6,7 @@ using namespace std;
 
 bool lvgl_screen2();
 void refresh_all_nodes();
+bool can_go_back = true;
 
 static AllNodesApp *nodes_app = new AllNodesApp();
 
@@ -67,8 +68,14 @@ bool AllNodesApp::back(void)
 {
 	ESP_BROOKESIA_LOGD("Back");
 
-	// If the app needs to exit, call notifyCoreClosed() to notify the core to close the app
-	ESP_BROOKESIA_CHECK_FALSE_RETURN(notifyCoreClosed(), false, "Notify core closed failed");
+	if (can_go_back)
+	{
+		// If the app needs to exit, call notifyCoreClosed() to notify the core to close the app
+		ESP_BROOKESIA_CHECK_FALSE_RETURN(notifyCoreClosed(), false, "Notify core closed failed");
+	} else {
+		refresh_all_nodes();
+	}
+	can_go_back = true;
 
 	return true;
 }
@@ -82,6 +89,7 @@ bool AllNodesApp::close(void)
 bool AllNodesApp::resume(void)
 {
 	ESP_BROOKESIA_LOGD("Resume");
-	refresh_all_nodes();
+	if(!can_go_back)
+		refresh_all_nodes();
 	return true;
 }

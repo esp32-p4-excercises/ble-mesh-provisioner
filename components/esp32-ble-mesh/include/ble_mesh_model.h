@@ -189,7 +189,7 @@ public:
     virtual void onSet(IBLEMeshModel *model, void *params) {}
     virtual void onGet(IBLEMeshModel *model, void *params) {}
     virtual void onChange(IBLEMeshModel *model, void *params) {}
-    virtual void onEvent(IBLEMeshModel *model, uint32_t event, void *params) { abort(); }
+    virtual void onEvent(IBLEMeshModel *model, uint32_t event, void *params) { ESP_LOGW(TAG, "deprecated"); }
     virtual void onEvent(IBLEMeshModel *model, uint32_t event, uint32_t opcode, void *params) { abort(); }
 };
 

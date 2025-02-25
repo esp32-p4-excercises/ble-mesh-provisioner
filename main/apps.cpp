@@ -7,6 +7,8 @@ void install_nodes_app(ESP_Brookesia_Phone *phone);
 void install_on_off_control_app(ESP_Brookesia_Phone *phone);
 void install_level_control_app(ESP_Brookesia_Phone *phone);
 void install_hsl_control_app(ESP_Brookesia_Phone *phone);
+void install_location_app(ESP_Brookesia_Phone *phone);
+void install_time_app(ESP_Brookesia_Phone *phone);
 
 void install_apps(ESP_Brookesia_Phone *phone)
 {
@@ -15,4 +17,7 @@ void install_apps(ESP_Brookesia_Phone *phone)
 	install_on_off_control_app(phone);
 	install_level_control_app(phone);
 	install_hsl_control_app(phone);
+
+	install_location_app(phone);
+	install_time_app(phone);
 }

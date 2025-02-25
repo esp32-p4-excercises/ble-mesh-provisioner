@@ -10,14 +10,17 @@
 
 static void lvgl_nodes_select_node(uint16_t addr);
 const char *mesh_model_get_type(uint16_t id);
-void model_modal_mbox_open(uint16_t addr, uint16_t model);
+void element_model_details(uint16_t addr, uint16_t model, lv_obj_t *parent = nullptr);
 void mesh_node_reset_node(uint16_t addr);
 void mesh_node_get_comp_data(uint16_t addr);
+lv_obj_t *create_button(lv_obj_t *parent, const char *txt);
 
 static lv_obj_t *screen = NULL;
 static lv_obj_t *left_pane = NULL;
 static lv_obj_t *right_pane = NULL;
 static lv_style_t style;
+					
+extern bool can_go_back;
 
 static void select_event_cb(lv_event_t *e)
 {
@@ -30,8 +33,11 @@ static void select_event_cb(lv_event_t *e)
 
 static void lvgl_nodes_select_node(uint16_t addr)
 {
-	lv_obj_clean(right_pane);
-	esp_ble_mesh_node_t *node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
+	can_go_back = false;
+	auto parent = left_pane;
+	// lv_obj_set_flex_flow(left_pane, LV_FLEX_FLOW_COLUMN);
+	lv_obj_clean(parent);
+	// esp_ble_mesh_node_t *node = esp_ble_mesh_provisioner_get_node_with_addr(addr);
 	auto comp = *mesh_get_composition(addr);
 	if (comp.element_num == 0)
 	{
@@ -39,82 +45,149 @@ static void lvgl_nodes_select_node(uint16_t addr)
 		// return;
 	}
 
-	auto label = lv_label_create(right_pane);
+	auto label = lv_label_create(parent);
 	lv_label_set_text_fmt(label, "Address: 0x%04X", addr);
-	for (size_t i = 0; i < comp.element_num; i++)
-	{
-		auto btn = lv_btn_create(right_pane);
 
+	{ // detail button
+		auto cont = lv_msgbox_create(parent, "Details", NULL, NULL, false);
+		lv_obj_set_width(cont, lv_pct(100));
+		auto mbox = lv_msgbox_get_content(cont);
+		lv_obj_set_flex_flow(mbox, LV_FLEX_FLOW_COLUMN);
+		label = lv_label_create(cont);
+		lv_label_set_text_fmt(label, "node name");
+		auto btn = lv_btn_create(cont);
 		label = lv_label_create(btn);
-		lv_label_set_text_fmt(label, "Element: 0x%04X", addr + i);
+		lv_label_set_text(label, "More");
+		lv_obj_add_event_cb(btn, [](lv_event_t *ev){
 
-		auto elem = comp.elements[i];
-		auto cont0 = lv_obj_create(right_pane);
-		lv_obj_set_size(cont0, LV_SIZE_CONTENT, LV_PCT(100));
-		lv_obj_set_flex_flow(cont0, LV_FLEX_FLOW_COLUMN);
-		for (size_t j = 0; j < elem.count; j++)
-		{
-			auto cont = lv_obj_create(cont0);
-			lv_obj_set_size(cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-			lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW);
-
-			lv_obj_t *bind_btn = nullptr;
-			auto lbl = lv_label_create(cont);
-			if (elem.models[j].vnd_id == 0xffff)
-			{
-				lv_label_set_text_fmt(lbl, "%s\nSIG Model ID: 0x%04X", mesh_model_get_type(elem.models[j].mod_id), elem.models[j].mod_id);
-			}
-			else
-			{
-				lv_label_set_text_fmt(lbl, "Vendor model\nVendor Model ID: 0x%04X%04X", elem.models[j].vnd_id, elem.models[j].mod_id);
-			}
-
-			// bind_btn = lv_button_create(cont);
-			auto click = [](lv_event_t *ev)
-			{
-				auto val = (uint32_t)lv_event_get_user_data(ev);
-				uint16_t model = val & 0xffff;
-				uint16_t addr = val >> 16;
-				printf("\t\t0x%04X, 0x%04X\n", addr, model);
-				model_modal_mbox_open(addr, model);
-			};
-			uint32_t val = ((addr + i) << 16) + elem.models[j].mod_id;
-			lv_obj_add_event_cb(cont, click, LV_EVENT_SHORT_CLICKED, (void *)val);
-		}
-
-		lv_obj_set_size(cont0, LV_SIZE_CONTENT, 0);
-		auto click = [](lv_event_t *ev)
-		{
-			lv_event_code_t code = lv_event_get_code(ev);
-			auto cont = (lv_obj_t *)lv_event_get_user_data(ev);
-			if (lv_obj_has_flag(cont, LV_OBJ_FLAG_USER_1))
-			{
-				lv_obj_set_size(cont, LV_SIZE_CONTENT, 0);
-				lv_obj_clear_flag(cont, LV_OBJ_FLAG_USER_1);
-			}
-			else
-			{
-				lv_obj_set_size(cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-				lv_obj_add_flag(cont, LV_OBJ_FLAG_USER_1);
-			}
-		};
-		lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, cont0);
+		}, LV_EVENT_SHORT_CLICKED, NULL);
 	}
 
-	auto btn = lv_btn_create(right_pane);
-	label = lv_label_create(btn);
-	lv_label_set_text(label, "Reset node");
-	auto reset = [](lv_event_t *ev)
-	{
-		auto addr = (uint32_t)lv_event_get_user_data(ev);
-		mesh_node_reset_node(addr);
-	};
-	lv_obj_add_event_cb(btn, reset, LV_EVENT_SHORT_CLICKED, (void *)addr);
+	{ // elements
+		auto cont = lv_msgbox_create(parent, "Elements", NULL, NULL, false);
+		lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+		lv_obj_set_width(cont, lv_pct(100));
+		auto mbox = lv_msgbox_get_content(cont);
+		lv_obj_set_flex_flow(mbox, LV_FLEX_FLOW_COLUMN);
+
+		for (size_t i = 0; i < comp.element_num; i++)
+		{
+			auto btn = lv_btn_create(cont);
+
+			label = lv_label_create(btn);
+			lv_label_set_text_fmt(label, "Element: 0x%04X", addr + i);
+
+			auto elem = comp.elements[i];
+			auto cont0 = lv_obj_create(cont);
+			lv_obj_set_size(cont0, lv_pct(100), LV_SIZE_CONTENT);
+			lv_obj_set_flex_flow(cont0, LV_FLEX_FLOW_COLUMN);
+			for (size_t j = 0; j < elem.count; j++)
+			{
+				auto cont = lv_obj_create(cont0);
+				lv_obj_set_size(cont, lv_pct(100), LV_SIZE_CONTENT);
+				// lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW);
+
+				auto lbl = lv_label_create(cont);
+				if (elem.models[j].vnd_id == 0xffff)
+				{
+					lv_label_set_text_fmt(lbl, "%s\nSIG Model ID: 0x%04X", mesh_model_get_type(elem.models[j].mod_id), elem.models[j].mod_id);
+				}
+				else
+				{
+					lv_label_set_text_fmt(lbl, "Vendor model\nVendor Model ID: 0x%04X%04X", elem.models[j].vnd_id, elem.models[j].mod_id);
+				}
+
+				auto click = [](lv_event_t *ev)
+				{
+					auto val = (uint32_t)lv_event_get_user_data(ev);
+					uint16_t model = val & 0xffff;
+					uint16_t addr = val >> 16;
+					printf("\t\t0x%04X, 0x%04X\n", addr, model);
+					can_go_back = false;
+					element_model_details(addr, model, right_pane);
+				};
+				uint32_t val = ((addr + i) << 16) + elem.models[j].mod_id;
+				lv_obj_add_event_cb(cont, click, LV_EVENT_SHORT_CLICKED, (void *)val);
+			}
+
+			lv_obj_set_size(cont0, lv_pct(100), 0);
+			auto click = [](lv_event_t *ev)
+			{
+				lv_event_code_t code = lv_event_get_code(ev);
+				auto cont = (lv_obj_t *)lv_event_get_user_data(ev);
+				if (lv_obj_has_flag(cont, LV_OBJ_FLAG_USER_1))
+				{
+					lv_obj_set_size(cont, lv_pct(100), 0);
+					lv_obj_clear_flag(cont, LV_OBJ_FLAG_USER_1);
+				}
+				else
+				{
+					lv_obj_set_size(cont, lv_pct(100), LV_SIZE_CONTENT);
+					lv_obj_add_flag(cont, LV_OBJ_FLAG_USER_1);
+				}
+			};
+			lv_obj_add_event_cb(btn, click, LV_EVENT_SHORT_CLICKED, cont0);
+		}
+	}
+
+	{ // keys
+	}
+
+	{ // default TTL
+		auto cont = lv_msgbox_create(parent, "Default TTL", NULL, NULL, false);
+		lv_obj_set_width(cont, lv_pct(100));
+		auto mbox = lv_msgbox_get_content(cont);
+		lv_obj_set_flex_flow(mbox, LV_FLEX_FLOW_COLUMN);
+
+		auto btn = create_button(cont, "Get TTL");
+		lv_obj_add_event_cb(btn, [](lv_event_t *ev){
+
+		}, LV_EVENT_SHORT_CLICKED, NULL);
+		btn = create_button(cont, "Set TTL");
+		lv_obj_add_event_cb(btn, [](lv_event_t *ev){
+
+		}, LV_EVENT_SHORT_CLICKED, NULL);
+	}
+
+	{ // proxy state
+		auto cont = lv_msgbox_create(parent, "Proxy state", NULL, NULL, false);
+		lv_obj_set_width(cont, lv_pct(100));
+		auto mbox = lv_msgbox_get_content(cont);
+		lv_obj_set_flex_flow(mbox, LV_FLEX_FLOW_COLUMN);
+
+		auto btn = create_button(cont, "Read state");
+		lv_obj_add_event_cb(btn, [](lv_event_t *ev){
+
+		}, LV_EVENT_SHORT_CLICKED, NULL);
+		btn = create_button(cont, "On");
+		lv_obj_add_event_cb(btn, [](lv_event_t *ev){
+
+		}, LV_EVENT_SHORT_CLICKED, NULL);
+	}
+
+	{ // reset button
+		auto cont = lv_msgbox_create(parent, "Reset node", NULL, NULL, false);
+		lv_obj_set_width(cont, lv_pct(100));
+		auto mbox = lv_msgbox_get_content(cont);
+		lv_obj_set_flex_flow(mbox, LV_FLEX_FLOW_COLUMN);
+
+		auto btn = lv_btn_create(cont);
+		label = lv_label_create(btn);
+		lv_label_set_text(label, "Reset");
+		auto reset = [](lv_event_t *ev)
+		{
+			auto addr = (uint32_t)lv_event_get_user_data(ev);
+			mesh_node_reset_node(addr);
+		};
+		lv_obj_add_event_cb(btn, reset, LV_EVENT_SHORT_CLICKED, (void *)addr);
+	}
 }
 
 void refresh_all_nodes()
 {
+	can_go_back = true;
 	lv_obj_clean(left_pane);
+	lv_obj_clean(right_pane);
 	auto count = BLEmeshProvisioner::GetInstance()->nodesCount();
 	auto nodes = BLEmeshProvisioner::GetInstance()->getNodes();
 
@@ -173,9 +246,9 @@ bool lvgl_screen2()
 	lv_obj_set_size(screen, LV_PCT(100), LV_PCT(100));
 	lv_obj_set_flex_flow(right_pane, LV_FLEX_FLOW_COLUMN);
 
-	lv_obj_set_pos(right_pane, LV_PCT(60), 0);
-	lv_obj_set_size(left_pane, LV_PCT(60), LV_PCT(100));
-	lv_obj_set_size(right_pane, LV_PCT(40), LV_PCT(100));
+	lv_obj_set_pos(right_pane, LV_PCT(55), 0);
+	lv_obj_set_size(left_pane, LV_PCT(55), LV_PCT(100));
+	lv_obj_set_size(right_pane, LV_PCT(45), LV_PCT(100));
 
 	lv_obj_set_flex_flow(left_pane, LV_FLEX_FLOW_COLUMN);
 

@@ -12,7 +12,7 @@
 #include "esp_brookesia.hpp"
 
 #define EXAMPLE_SHOW_MEM_INFO (1)
-//  #include "app_examples/phone/simple_conf/src/phone_app_simple_conf.hpp"
+
 #include "provisioner_app.h"
 #include "all_nodes_app.h"
 
@@ -29,15 +29,22 @@ extern "C" void app_main(void)
 	bsp_display_cfg_t cfg = {
 		.lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
 		.buffer_size = BSP_LCD_H_RES * BSP_LCD_V_RES,
+		.hw_cfg = {
+			.dsi_bus = 
+			{
+				.lane_bit_rate_mbps = 800,
+			},
+		},
 		.flags = {
 			.buff_dma = false,
 			.buff_spiram = true,
-			.sw_rotate = false,
+			.sw_rotate = true,
 		}};
 	cfg.lvgl_port_cfg.task_stack = 10000;
 
 	lv_disp_t *disp = bsp_display_start_with_config(&cfg);
-	bsp_display_brightness_set(25);
+	bsp_display_brightness_set(100);
+	lv_disp_set_rotation(disp, LV_DISP_ROT_180);
 
 	ESP_LOGI(TAG, "Display ESP-Brookesia phone demo");
 	/**
@@ -88,6 +95,40 @@ extern "C" void app_main(void)
 	install_apps(phone);
 
 	phone->unlockLv();
+
+
+	char buffer[128];    /* Make sure buffer is enough for `sprintf` */
+    size_t internal_free = 0;
+    size_t internal_total = 0;
+    size_t external_free = 0;
+    size_t external_total = 0;
+    while (1) {
+        internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        internal_total = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+        external_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        external_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+        // sprintf(buffer, "   Biggest /     Free /    Total\n"
+        //         "\t  SRAM : [%8d / %8d / %8d]\n"
+        //         "\t PSRAM : [%8d / %8d / %8d]",
+        //         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL), internal_free, internal_total,
+        //         heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM), external_free, external_total);
+        // ESP_LOGI("MEM", "%s", buffer);
+
+        /**
+         * The `lockLv()` and `unlockLv()` functions are used to lock and unlock the LVGL task.
+         * They are registered by the `registerLvLockCallback()` and `registerLvUnlockCallback()` functions.
+         */
+        phone->lockLv();
+        // Update memory label on "Recents Screen"
+        if (!phone->getHome().getRecentsScreen()->setMemoryLabel(
+                    internal_free / 1024, internal_total / 1024, external_free / 1024, external_total / 1024
+                )) {
+            ESP_LOGE(TAG, "Set memory label failed");
+        }
+        phone->unlockLv();
+
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
 }
 
 static void on_clock_update_timer_cb(struct _lv_timer_t *t)

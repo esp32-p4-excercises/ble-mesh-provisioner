@@ -149,7 +149,13 @@ void _default_ble_mesh_lighting_server_cb(esp_ble_mesh_lighting_server_cb_event_
 
 void _default_ble_mesh_time_scene_client_cb(esp_ble_mesh_time_scene_client_cb_event_t event, esp_ble_mesh_time_scene_client_cb_param_t *params)
 {
-
+    printf("time client callback event: %d\n", event);
+    auto device = IBLEmeshDevice::GetInstance();
+    IBLEMeshModel* model = NULL;
+    if(device)
+        model = device->findModel(params->params->model);
+    if(model)
+        model->onEvent(event, params->params->ctx.recv_op, params);
 }
 
 void _default_ble_mesh_time_scene_server_cb(esp_ble_mesh_time_scene_server_cb_event_t event, esp_ble_mesh_time_scene_server_cb_param_t *params)

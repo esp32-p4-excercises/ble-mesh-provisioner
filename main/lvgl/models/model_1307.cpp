@@ -76,8 +76,9 @@ void model_1307_modal_action(lv_obj_t* parent, uint16_t addr, bool clean)
 	mesh_model_get_hsl(address);
 }
 
-void lvgl_update_hue_sliders(uint16_t hue, uint16_t sat, uint16_t light)
+void lvgl_update_hue_sliders(uint16_t addr, uint16_t hue, uint16_t sat, uint16_t light)
 {
+	if(address != addr) return;
 	if(slider_hue)
 	{
 		lv_slider_set_value(slider_hue, hue, LV_ANIM_OFF);
